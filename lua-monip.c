@@ -20,7 +20,7 @@
 #include <lauxlib.h>
 
 #define VERSION "0.1"
-//#define AUTORELOAD
+#define AUTORELOAD
 
 static int lb_reverse(int a)
 {
@@ -103,7 +103,10 @@ static int monipdata_init(const char *file)
     machine_little_endian = ((char *)&machine_endian_check)[0];
 
     uint32_t nlen;
-    strcpy(monipdata_file, file);
+
+    if(monipdata_file != file){
+        strcpy(monipdata_file, file);
+    }
     int fd = open(file, O_RDONLY, 0);
 
     if(fd > -1) {
@@ -157,8 +160,7 @@ static const char *getposbyip(const char *ip_str, int *len)
         if(stat(monipdata_file, &sb) != -1) {
             if(sb.st_mtime != monipdata_file_mtime) {
                 monipdata_file_mtime = sb.st_mtime;
-                printf("reload\n");
-                monipdata_init("17monipdb.dat");
+                monipdata_init(monipdata_file);
             }
         }
     }
@@ -183,14 +185,16 @@ static const char *getposbyip(const char *ip_str, int *len)
 #ifdef HAVE_INET_PTON
 
     if(ip_str_len == 0 || inet_pton(AF_INET, ip_str, &uip) != 1) {
-        return NULL;
+        *len = 28;
+        return "未知\t未知\t未知\t\t未知";
     }
 
     lgip = ntohl(uip.s_addr);
 #else
 
     if(ip_str_len == 0 || (uip = inet_addr(ip_str)) == INADDR_NONE) {
-        return NULL;
+        *len = 28;
+        return "未知\t未知\t未知\t\t未知";
     }
 
     lgip = ntohl(uip);
@@ -229,7 +233,7 @@ static const char *getposbyip(const char *ip_str, int *len)
 
         if(memcmp((monipdata + 4) + start, nip, 4) >= 0) {
             memcpy(&index_offset, (monipdata + 4) + start + 4, 3);
-            memcpy(&index_offset + 3, "\x0", 1);
+            //memcpy(&index_offset + 3, "\x0", 1);
 
             if(!machine_little_endian) {
                 index_offset = lb_reverse(index_offset);
@@ -241,7 +245,8 @@ static const char *getposbyip(const char *ip_str, int *len)
     }
 
     if(index_offset < 1 || (monipdata_offset + index_offset - 1024 + pos_len) > monipdata_len) {
-        return NULL;
+        *len = 28;
+        return "未知\t未知\t未知\t\t未知";
     }
 
     *len = pos_len;
